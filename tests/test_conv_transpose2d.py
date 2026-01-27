@@ -55,12 +55,17 @@ def test_accuracy_conv_transpose2d(
     ref_inp = to_reference(inp, True)
     torch.backends.cudnn.allow_tf32 = False
 
-    weight = torch.randn(kernel, dtype=dtype, device=flag_gems.device, requires_grad=True)
+    weight = torch.randn(
+        kernel, dtype=dtype, device=flag_gems.device, requires_grad=True
+    )
     ref_weight = to_reference(weight, True)
 
     if bias:
         bias_tensor = torch.randn(
-            [kernel[1] * groups], dtype=dtype, device=flag_gems.device, requires_grad=True
+            [kernel[1] * groups],
+            dtype=dtype,
+            device=flag_gems.device,
+            requires_grad=True,
         )
         bias_ref = to_reference(bias_tensor, True)
     else:
@@ -127,7 +132,7 @@ def test_edge_case_1x1_kernel(dtype):
     """Test with 1x1 kernel."""
     shape = (2, 4, 8, 8)
     kernel = (4, 8, 1, 1)
-    
+
     inp = torch.randn(shape, dtype=dtype, device=flag_gems.device)
     ref_inp = to_reference(inp, False)
     weight = torch.randn(kernel, dtype=dtype, device=flag_gems.device)
@@ -146,7 +151,7 @@ def test_edge_case_large_stride(dtype):
     shape = (2, 4, 4, 4)
     kernel = (4, 8, 3, 3)
     stride = 4
-    
+
     inp = torch.randn(shape, dtype=dtype, device=flag_gems.device)
     ref_inp = to_reference(inp, False)
     weight = torch.randn(kernel, dtype=dtype, device=flag_gems.device)
@@ -166,7 +171,7 @@ def test_edge_case_asymmetric_params(dtype):
     kernel = (4, 8, 3, 3)
     stride = (2, 3)
     padding = (1, 2)
-    
+
     inp = torch.randn(shape, dtype=dtype, device=flag_gems.device)
     ref_inp = to_reference(inp, False)
     weight = torch.randn(kernel, dtype=dtype, device=flag_gems.device)
@@ -186,7 +191,7 @@ def test_edge_case_zero_values(dtype):
     """Test with zero input values."""
     shape = (2, 4, 8, 8)
     kernel = (4, 8, 3, 3)
-    
+
     inp = torch.zeros(shape, dtype=dtype, device=flag_gems.device)
     ref_inp = to_reference(inp, False)
     weight = torch.randn(kernel, dtype=dtype, device=flag_gems.device)
@@ -204,7 +209,7 @@ def test_edge_case_negative_values(dtype):
     """Test with negative input values."""
     shape = (2, 4, 8, 8)
     kernel = (4, 8, 3, 3)
-    
+
     inp = -torch.abs(torch.randn(shape, dtype=dtype, device=flag_gems.device))
     ref_inp = to_reference(inp, False)
     weight = torch.randn(kernel, dtype=dtype, device=flag_gems.device)
@@ -222,7 +227,7 @@ def test_edge_case_single_batch(dtype):
     """Test with batch size 1."""
     shape = (1, 4, 8, 8)
     kernel = (4, 8, 3, 3)
-    
+
     inp = torch.randn(shape, dtype=dtype, device=flag_gems.device)
     ref_inp = to_reference(inp, False)
     weight = torch.randn(kernel, dtype=dtype, device=flag_gems.device)
@@ -240,7 +245,7 @@ def test_edge_case_large_batch(dtype):
     """Test with large batch size."""
     shape = (32, 4, 8, 8)
     kernel = (4, 8, 3, 3)
-    
+
     inp = torch.randn(shape, dtype=dtype, device=flag_gems.device)
     ref_inp = to_reference(inp, False)
     weight = torch.randn(kernel, dtype=dtype, device=flag_gems.device)

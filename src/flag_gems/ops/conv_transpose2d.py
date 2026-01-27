@@ -110,7 +110,7 @@ def conv_transpose2d_forward_kernel(
 ):
     """
     Transposed convolution forward kernel.
-    
+
     For transposed convolution, each input element contributes to multiple output elements.
     The relationship is: output[n, oc, oh, ow] += input[n, ic, ih, iw] * weight[ic, oc, kh, kw]
     where oh = ih * stride_h - padding_h + kh * dilation_h
@@ -156,13 +156,17 @@ def conv_transpose2d_forward_kernel(
             in_w_idx = numerator_w // stride_width
 
             # Mask for valid contributions
-            valid_h = (numerator_h % stride_height == 0) & (in_h_idx >= 0) & (
-                in_h_idx < input_height
+            valid_h = (
+                (numerator_h % stride_height == 0)
+                & (in_h_idx >= 0)
+                & (in_h_idx < input_height)
             )
-            valid_w = (numerator_w % stride_width == 0) & (in_w_idx >= 0) & (
-                in_w_idx < input_width
+            valid_w = (
+                (numerator_w % stride_width == 0)
+                & (in_w_idx >= 0)
+                & (in_w_idx < input_width)
             )
-            
+
             # Loop over input channels in blocks
             for c_block in range((in_per_group_c + BLOCK_CI - 1) // BLOCK_CI):
                 c_idx = c_block * BLOCK_CI
@@ -172,7 +176,9 @@ def conv_transpose2d_forward_kernel(
                 curr_input_pointer = (
                     input_pointer
                     + (input_n_stride * batch_idx)[:, None]
-                    + (input_c_stride * (pid_group * in_per_group_c + in_c_offset))[None, :]
+                    + (input_c_stride * (pid_group * in_per_group_c + in_c_offset))[
+                        None, :
+                    ]
                     + (input_height_stride * in_h_idx)[:, None]
                     + (input_width_stride * in_w_idx)[:, None]
                 )
@@ -180,7 +186,9 @@ def conv_transpose2d_forward_kernel(
                 # Weight pointer: [in_c, out_c, kh, kw]
                 curr_weight_pointer = (
                     weight_pointer
-                    + (weight_n_stride * (pid_group * in_per_group_c + in_c_offset))[:, None]
+                    + (weight_n_stride * (pid_group * in_per_group_c + in_c_offset))[
+                        :, None
+                    ]
                     + (weight_c_stride * out_c_offset)[None, :]
                     + (weight_height_stride * kh)
                     + (weight_width_stride * kw)
@@ -202,7 +210,9 @@ def conv_transpose2d_forward_kernel(
 
                 # Compute contribution and accumulate directly in float32
                 # Specify out_dtype=tl.float32 to ensure accumulation happens in float32
-                accum += tl.dot(input_block, weight_block, out_dtype=tl.float32, allow_tf32=False)
+                accum += tl.dot(
+                    input_block, weight_block, out_dtype=tl.float32, allow_tf32=False
+                )
 
     # Add bias
     bias_ptr = bias_pointer + (pid_group * out_per_group_c + out_c_offset)[None, :]
@@ -233,7 +243,7 @@ class ConvTranspose2d(torch.autograd.Function):
         ctx, input, weight, bias, stride, padding, output_padding, dilation, groups
     ):
         logger.debug("GEMS CONV_TRANSPOSE2D")
-        
+
         # Validate dimensions
         if weight.ndim != 4:
             raise ValueError(f"Weights must be 4D, received shape {weight.shape}")
@@ -250,7 +260,7 @@ class ConvTranspose2d(torch.autograd.Function):
                 f"Incompatible input channels: input has {input.shape[1]} channels, "
                 f"but weight expects {in_c} channels (weight shape: {weight.shape}, groups: {groups})"
             )
-        
+
         # Validate bias
         if bias is not None and out_c != bias.shape[0]:
             raise ValueError(
@@ -297,7 +307,7 @@ class ConvTranspose2d(torch.autograd.Function):
         )
 
         output_dtype = input.dtype
-        
+
         # Use pure tensor operations for forward pass to ensure precision
         # Use float64 for accumulation to match PyTorch CPU precision
         output = torch.zeros(
@@ -305,11 +315,11 @@ class ConvTranspose2d(torch.autograd.Function):
             device=input.device,
             dtype=torch.float64,  # Use float64 for maximum precision
         )
-        
+
         # Convert input and weight to float64 for computation
         input_f64 = input.to(torch.float64)
         weight_f64 = weight.to(torch.float64)
-        
+
         # Process each group
         in_per_group_c = in_c // groups
         for g in range(groups):
@@ -317,7 +327,7 @@ class ConvTranspose2d(torch.autograd.Function):
             ic_end = (g + 1) * in_per_group_c
             oc_start = g * out_c_per_group
             oc_end = (g + 1) * out_c_per_group
-            
+
             # For each kernel position
             for kh in range(weight_height):
                 for kw in range(weight_width):
@@ -326,26 +336,30 @@ class ConvTranspose2d(torch.autograd.Function):
                         oh = ih * stride_height - padding_height + kh * dilation_height
                         if oh < 0 or oh >= out_height:
                             continue
-                            
+
                         for iw in range(input_width):
                             ow = iw * stride_width - padding_width + kw * dilation_width
                             if ow < 0 or ow >= out_width:
                                 continue
-                            
+
                             # input: [N, ic], weight: [ic, oc]
                             # output: [N, oc] += input @ weight
-                            input_slice = input_f64[:, ic_start:ic_end, ih, iw]  # [N, ic]
-                            weight_slice = weight_f64[ic_start:ic_end, :, kh, kw]  # [ic, oc]
-                            
+                            input_slice = input_f64[
+                                :, ic_start:ic_end, ih, iw
+                            ]  # [N, ic]
+                            weight_slice = weight_f64[
+                                ic_start:ic_end, :, kh, kw
+                            ]  # [ic, oc]
+
                             # [N, ic] @ [ic, oc] = [N, oc]
                             output[:, oc_start:oc_end, oh, ow] += torch.matmul(
                                 input_slice, weight_slice
                             )
-        
+
         # Add bias
         if bias is not None:
             output += bias.to(torch.float64).view(1, -1, 1, 1)
-        
+
         # Convert back to original dtype
         output = output.to(output_dtype)
 
@@ -371,7 +385,7 @@ class ConvTranspose2d(torch.autograd.Function):
         grad_input = None
         grad_weight = None
         grad_bias = None
-        
+
         if ctx.needs_input_grad[0]:
             # Compute grad_input
             # For conv_transpose2d: output[n, oc, oh, ow] = sum over (ic, kh, kw) of input[n, ic, ih, iw] * weight[ic, oc, kh, kw]
@@ -379,94 +393,118 @@ class ConvTranspose2d(torch.autograd.Function):
             #
             # So: grad_input[n, ic, ih, iw] = sum over (oc, kh, kw, oh, ow) of grad_output[n, oc, oh, ow] * weight[ic, oc, kh, kw]
             # where oh = ih * stride_h - padding_h + kh * dilation_h
-            
+
             in_c, out_c_per_group, kh, kw = weight.shape
             N, out_c, H_out, W_out = grad_output.shape
             _, _, H_in, W_in = input.shape
-            
+
             # Use float64 for accumulation to ensure precision for large tensors like shape6
             grad_input = torch.zeros_like(input, dtype=torch.float64)
             grad_output_f64 = grad_output.to(torch.float64)
             weight_f64 = weight.to(torch.float64)
-            
+
             # Process each group
             for g in range(groups):
                 ic_start = g * (in_c // groups)
                 ic_end = (g + 1) * (in_c // groups)
                 oc_start = g * out_c_per_group
                 oc_end = (g + 1) * out_c_per_group
-                
+
                 # For each kernel position
                 for kh_idx in range(kh):
                     for kw_idx in range(kw):
                         # For each input spatial position
                         for ih in range(H_in):
-                            oh = ih * stride_height - padding_height + kh_idx * dilation_height
+                            oh = (
+                                ih * stride_height
+                                - padding_height
+                                + kh_idx * dilation_height
+                            )
                             if oh < 0 or oh >= H_out:
                                 continue
-                                
+
                             for iw in range(W_in):
-                                ow = iw * stride_width - padding_width + kw_idx * dilation_width
+                                ow = (
+                                    iw * stride_width
+                                    - padding_width
+                                    + kw_idx * dilation_width
+                                )
                                 if ow < 0 or ow >= W_out:
                                     continue
-                                
+
                                 # grad_output: [N, oc], weight: [ic, oc]
                                 # grad_input: [N, ic] += grad_output @ weight.T
-                                grad_out_slice = grad_output_f64[:, oc_start:oc_end, oh, ow]  # [N, oc]
-                                weight_slice = weight_f64[ic_start:ic_end, :, kh_idx, kw_idx]  # [ic, oc]
-                                
+                                grad_out_slice = grad_output_f64[
+                                    :, oc_start:oc_end, oh, ow
+                                ]  # [N, oc]
+                                weight_slice = weight_f64[
+                                    ic_start:ic_end, :, kh_idx, kw_idx
+                                ]  # [ic, oc]
+
                                 # [N, oc] @ [oc, ic] = [N, ic]
                                 grad_input[:, ic_start:ic_end, ih, iw] += torch.matmul(
                                     grad_out_slice, weight_slice.t()
                                 )
-            
+
             grad_input = grad_input.to(input.dtype)
 
         if ctx.needs_input_grad[1]:
             # Compute grad_weight
             # grad_weight[ic, oc, kh, kw] = sum over (n, ih, iw) of input[n, ic, ih, iw] * grad_output[n, oc, oh, ow]
             # where oh = ih * stride_h - padding_h + kh * dilation_h
-            
+
             in_c, out_c_per_group, kh, kw = weight.shape
             N, out_c, H_out, W_out = grad_output.shape
             _, _, H_in, W_in = input.shape
-            
+
             # Use float64 for accumulation to ensure precision for large tensors like shape6
             grad_weight = torch.zeros_like(weight, dtype=torch.float64)
             grad_output_f64 = grad_output.to(torch.float64)
             input_f64 = input.to(torch.float64)
-            
+
             # Process each group
             for g in range(groups):
                 ic_start = g * (in_c // groups)
                 ic_end = (g + 1) * (in_c // groups)
                 oc_start = g * out_c_per_group
                 oc_end = (g + 1) * out_c_per_group
-                
+
                 # For each kernel position
                 for kh_idx in range(kh):
                     for kw_idx in range(kw):
                         # For each input spatial position
                         for ih in range(H_in):
-                            oh = ih * stride_height - padding_height + kh_idx * dilation_height
+                            oh = (
+                                ih * stride_height
+                                - padding_height
+                                + kh_idx * dilation_height
+                            )
                             if oh < 0 or oh >= H_out:
                                 continue
-                                
+
                             for iw in range(W_in):
-                                ow = iw * stride_width - padding_width + kw_idx * dilation_width
+                                ow = (
+                                    iw * stride_width
+                                    - padding_width
+                                    + kw_idx * dilation_width
+                                )
                                 if ow < 0 or ow >= W_out:
                                     continue
-                                
+
                                 # input: [N, ic], grad_output: [N, oc]
                                 # grad_weight: [ic, oc] += input.T @ grad_output
-                                input_slice = input_f64[:, ic_start:ic_end, ih, iw]  # [N, ic]
-                                grad_out_slice = grad_output_f64[:, oc_start:oc_end, oh, ow]  # [N, oc]
-                                
+                                input_slice = input_f64[
+                                    :, ic_start:ic_end, ih, iw
+                                ]  # [N, ic]
+                                grad_out_slice = grad_output_f64[
+                                    :, oc_start:oc_end, oh, ow
+                                ]  # [N, oc]
+
                                 # [ic, N] @ [N, oc] = [ic, oc]
-                                grad_weight[ic_start:ic_end, :, kh_idx, kw_idx] += torch.matmul(
-                                    input_slice.t(), grad_out_slice
-                                )
-            
+                                grad_weight[
+                                    ic_start:ic_end, :, kh_idx, kw_idx
+                                ] += torch.matmul(input_slice.t(), grad_out_slice)
+
             grad_weight = grad_weight.to(weight.dtype)
 
         if bias is not None and ctx.needs_input_grad[2]:
@@ -476,7 +514,14 @@ class ConvTranspose2d(torch.autograd.Function):
 
 
 def conv_transpose2d(
-    input, weight, bias=None, stride=1, padding=0, output_padding=0, groups=1, dilation=1
+    input,
+    weight,
+    bias=None,
+    stride=1,
+    padding=0,
+    output_padding=0,
+    groups=1,
+    dilation=1,
 ):
     """
     Applies a 2D transposed convolution operator over an input image.

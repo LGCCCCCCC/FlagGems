@@ -47,7 +47,7 @@ class ConvTranspose2dBenchmark(GenericBenchmark):
                 kernel_w,
                 groups,
             ) = shape
-            
+
             inp = torch.randn(
                 (batch, in_channels, height, width),
                 dtype=cur_dtype,
@@ -63,7 +63,7 @@ class ConvTranspose2dBenchmark(GenericBenchmark):
                 dtype=cur_dtype,
                 device=self.device,
             )
-            
+
             # Yield: (input, weight, bias), then kwargs dict
             yield inp, weight, bias, {
                 "stride": 2,
