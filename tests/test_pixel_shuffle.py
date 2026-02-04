@@ -4,13 +4,7 @@ import torch
 
 import flag_gems
 
-from .accuracy_utils import (
-    FLOAT_DTYPES,
-    INT_DTYPES,
-    gems_assert_close,
-    gems_assert_equal,
-    to_reference,
-)
+from .accuracy_utils import FLOAT_DTYPES, INT_DTYPES, gems_assert_equal, to_reference
 from .conftest import QUICK_MODE
 
 # Test configurations for pixel_shuffle
@@ -53,15 +47,15 @@ else:
 @pytest.mark.parametrize("dtype", FLOAT_DTYPES_TEST)
 def test_accuracy_pixel_shuffle(shape, upscale_factor, dtype):
     """Test pixel_shuffle accuracy."""
-    inp = torch.randn(shape, dtype=dtype, device=flag_gems.device)
+    _ = torch.randn(shape, dtype=dtype, device=flag_gems.device)
 
-    ref_inp = to_reference(inp, False)
+    ref_inp = to_reference(_, False)
 
     # PyTorch reference
     ref_out = torch.nn.functional.pixel_shuffle(ref_inp, upscale_factor)
 
     # FlagGems implementation
-    res_out = flag_gems.pixel_shuffle(inp, upscale_factor)
+    res_out = flag_gems.pixel_shuffle(_, upscale_factor)
 
     # For layout operations, we expect exact match
     gems_assert_equal(res_out, ref_out)
@@ -72,27 +66,27 @@ def test_accuracy_pixel_shuffle(shape, upscale_factor, dtype):
 def test_accuracy_pixel_shuffle_edge_cases(dtype):
     """Test edge cases for pixel_shuffle."""
     # Test with ones (uniform values)
-    inp = torch.ones((1, 4, 4, 4), dtype=dtype, device=flag_gems.device)
-    ref_inp = to_reference(inp, False)
+    _ = torch.ones((1, 4, 4, 4), dtype=dtype, device=flag_gems.device)
+    ref_inp = to_reference(_, False)
 
     ref_out = torch.nn.functional.pixel_shuffle(ref_inp, 2)
-    res_out = flag_gems.pixel_shuffle(inp, 2)
+    res_out = flag_gems.pixel_shuffle(_, 2)
     gems_assert_equal(res_out, ref_out)
 
     # Test with zeros
-    inp = torch.zeros((1, 9, 8, 8), dtype=dtype, device=flag_gems.device)
-    ref_inp = to_reference(inp, False)
+    _ = torch.zeros((1, 9, 8, 8), dtype=dtype, device=flag_gems.device)
+    ref_inp = to_reference(_, False)
 
     ref_out = torch.nn.functional.pixel_shuffle(ref_inp, 3)
-    res_out = flag_gems.pixel_shuffle(inp, 3)
+    res_out = flag_gems.pixel_shuffle(_, 3)
     gems_assert_equal(res_out, ref_out)
 
     # Test with negative values
-    inp = torch.randn((1, 16, 8, 8), dtype=dtype, device=flag_gems.device) - 5.0
-    ref_inp = to_reference(inp, False)
+    _ = torch.randn((1, 16, 8, 8), dtype=dtype, device=flag_gems.device) - 5.0
+    ref_inp = to_reference(_, False)
 
     ref_out = torch.nn.functional.pixel_shuffle(ref_inp, 2)
-    res_out = flag_gems.pixel_shuffle(inp, 2)
+    res_out = flag_gems.pixel_shuffle(_, 2)
     gems_assert_equal(res_out, ref_out)
 
 
@@ -101,7 +95,7 @@ def test_accuracy_pixel_shuffle_edge_cases(dtype):
 def test_accuracy_pixel_shuffle_different_upscale_factors(dtype):
     """Test pixel_shuffle with different upscale factors."""
     shape = (1, 64, 16, 16)
-    inp = torch.randn(shape, dtype=dtype, device=flag_gems.device)
+    _ = torch.randn(shape, dtype=dtype, device=flag_gems.device)
 
     for r in [2, 4, 8]:
         # Adjust channels to be divisible by r^2
@@ -122,13 +116,11 @@ def test_accuracy_pixel_shuffle_different_upscale_factors(dtype):
 def test_accuracy_pixel_shuffle_different_batch_sizes(dtype):
     """Test pixel_shuffle with different batch sizes."""
     for batch_size in [1, 2, 4, 8, 16]:
-        inp = torch.randn(
-            (batch_size, 36, 16, 16), dtype=dtype, device=flag_gems.device
-        )
-        ref_inp = to_reference(inp, False)
+        _ = torch.randn((batch_size, 36, 16, 16), dtype=dtype, device=flag_gems.device)
+        ref_inp = to_reference(_, False)
 
         ref_out = torch.nn.functional.pixel_shuffle(ref_inp, 2)
-        res_out = flag_gems.pixel_shuffle(inp, 2)
+        res_out = flag_gems.pixel_shuffle(_, 2)
 
         gems_assert_equal(res_out, ref_out)
 
@@ -140,11 +132,11 @@ def test_accuracy_pixel_shuffle_different_spatial_sizes(dtype):
     spatial_sizes = [(4, 4), (8, 8), (16, 16), (32, 32), (64, 64), (128, 128)]
 
     for h, w in spatial_sizes:
-        inp = torch.randn((1, 16, h, w), dtype=dtype, device=flag_gems.device)
-        ref_inp = to_reference(inp, False)
+        _ = torch.randn((1, 16, h, w), dtype=dtype, device=flag_gems.device)
+        ref_inp = to_reference(_, False)
 
         ref_out = torch.nn.functional.pixel_shuffle(ref_inp, 2)
-        res_out = flag_gems.pixel_shuffle(inp, 2)
+        res_out = flag_gems.pixel_shuffle(_, 2)
 
         gems_assert_equal(res_out, ref_out)
 
@@ -154,11 +146,11 @@ def test_accuracy_pixel_shuffle_different_spatial_sizes(dtype):
 def test_accuracy_pixel_shuffle_large_input(dtype):
     """Test pixel_shuffle with large input sizes."""
     # Large spatial dimensions
-    inp = torch.randn((1, 64, 512, 512), dtype=dtype, device=flag_gems.device)
-    ref_inp = to_reference(inp, False)
+    _ = torch.randn((1, 64, 512, 512), dtype=dtype, device=flag_gems.device)
+    ref_inp = to_reference(_, False)
 
     ref_out = torch.nn.functional.pixel_shuffle(ref_inp, 2)
-    res_out = flag_gems.pixel_shuffle(inp, 2)
+    res_out = flag_gems.pixel_shuffle(_, 2)
 
     gems_assert_equal(res_out, ref_out)
 
@@ -167,35 +159,35 @@ def test_accuracy_pixel_shuffle_large_input(dtype):
 def test_pixel_shuffle_error_handling():
     """Test error handling for invalid inputs."""
     # Test with invalid upscale_factor
-    inp = torch.randn((1, 16, 8, 8), device=flag_gems.device)
+    _ = torch.randn((1, 16, 8, 8), device=flag_gems.device)
 
     with pytest.raises(ValueError, match="upscale_factor must be positive"):
-        flag_gems.pixel_shuffle(inp, 0)
+        flag_gems.pixel_shuffle(_, 0)
 
     with pytest.raises(ValueError, match="upscale_factor must be positive"):
-        flag_gems.pixel_shuffle(inp, -1)
+        flag_gems.pixel_shuffle(_, -1)
 
     # Test with channels not divisible by r^2
-    inp = torch.randn((1, 15, 8, 8), device=flag_gems.device)
+    _ = torch.randn((1, 15, 8, 8), device=flag_gems.device)
 
     with pytest.raises(ValueError, match="divisible by"):
-        flag_gems.pixel_shuffle(inp, 2)  # 15 is not divisible by 4
+        flag_gems.pixel_shuffle(_, 2)  # 15 is not divisible by 4
 
     # Test with insufficient dimensions
-    inp = torch.randn((16, 8), device=flag_gems.device)
+    _ = torch.randn((16, 8), device=flag_gems.device)
 
     with pytest.raises(ValueError, match="at least 3 dimensions"):
-        flag_gems.pixel_shuffle(inp, 2)
+        flag_gems.pixel_shuffle(_, 2)
 
 
 @pytest.mark.pixel_shuffle
 @pytest.mark.parametrize("dtype", INT_DTYPES)
 def test_accuracy_pixel_shuffle_integer_types(dtype):
     """Test pixel_shuffle with integer data types."""
-    inp = torch.randint(0, 100, (1, 16, 8, 8), dtype=dtype, device=flag_gems.device)
-    ref_inp = to_reference(inp, False)
+    _ = torch.randint(0, 100, (1, 16, 8, 8), dtype=dtype, device=flag_gems.device)
+    ref_inp = to_reference(_, False)
 
     ref_out = torch.nn.functional.pixel_shuffle(ref_inp, 2)
-    res_out = flag_gems.pixel_shuffle(inp, 2)
+    res_out = flag_gems.pixel_shuffle(_, 2)
 
     gems_assert_equal(res_out, ref_out)
