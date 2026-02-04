@@ -36,18 +36,18 @@ class PixelShuffleBenchmark(GenericBenchmark):
     """Benchmark class for pixel_shuffle operations."""
 
     def get_input_iter(self, cur_dtype):
-        # 按照赛题要求：小尺寸、常规尺寸、大尺寸
+        # According to the competition requirements: Small, Medium, Large
         # For pixel_shuffle, we need channels divisible by r^2
         # Using r=2, so channels must be divisible by 4
         shapes = [
-            # 小尺寸 (Small) - channels must be divisible by 4
+            # Small - channels must be divisible by 4
             (1, 4, 8, 8),  # Minimal
             (1, 16, 16, 16),  # Small
-            # 常规尺寸 (Medium)
+            # Medium
             (1, 64, 64, 64),  # Medium
             (4, 64, 128, 128),  # Medium with batch
             (1, 256, 256, 256),  # Large channels
-            # 大尺寸 (Large)
+            # Large
             (1, 64, 512, 512),  # Large spatial
             (1, 256, 1024, 1024),  # Very large
         ]
