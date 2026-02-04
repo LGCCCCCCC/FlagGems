@@ -1,11 +1,9 @@
 import logging
-import math
 
 import torch
 import triton
 import triton.language as tl
 
-from flag_gems import runtime
 from flag_gems.utils import libentry
 
 logger = logging.getLogger(__name__)
@@ -388,10 +386,12 @@ class ConvTranspose2d(torch.autograd.Function):
 
         if ctx.needs_input_grad[0]:
             # Compute grad_input
-            # For conv_transpose2d: output[n, oc, oh, ow] = sum over (ic, kh, kw) of input[n, ic, ih, iw] * weight[ic, oc, kh, kw]
+            # For conv_transpose2d: output[n, oc, oh, ow] = sum over (ic, kh, kw)
+            # of input[n, ic, ih, iw] * weight[ic, oc, kh, kw]
             # where oh = ih * stride_h - padding_h + kh * dilation_h
             #
-            # So: grad_input[n, ic, ih, iw] = sum over (oc, kh, kw, oh, ow) of grad_output[n, oc, oh, ow] * weight[ic, oc, kh, kw]
+            # So: grad_input[n, ic, ih, iw] = sum over (oc, kh, kw, oh, ow)
+            # of grad_output[n, oc, oh, ow] * weight[ic, oc, kh, kw]
             # where oh = ih * stride_h - padding_h + kh * dilation_h
 
             in_c, out_c_per_group, kh, kw = weight.shape
