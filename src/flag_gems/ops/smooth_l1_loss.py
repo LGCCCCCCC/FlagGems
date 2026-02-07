@@ -50,9 +50,16 @@ def smooth_l1_loss_forward_kernel(
     abs_diff = tl.abs(diff)
 
     # Smooth L1 loss formula
-    # if |diff| < beta: 0.5 * diff^2 / beta
-    # else: |diff| - 0.5 * beta
-    loss = tl.where(abs_diff < beta, 0.5 * diff * diff / beta, abs_diff - 0.5 * beta)
+    # When beta > 0:
+    #   if |diff| < beta: 0.5 * diff^2 / beta
+    #   else: |diff| - 0.5 * beta
+    # When beta == 0: L1 loss = |diff|
+    if beta > 0:
+        loss = tl.where(
+            abs_diff < beta, 0.5 * diff * diff / beta, abs_diff - 0.5 * beta
+        )
+    else:
+        loss = abs_diff
 
     # Store result
     tl.store(output_ptr + offsets, loss, mask=mask)
@@ -100,9 +107,14 @@ def smooth_l1_loss_backward_kernel(
     abs_diff = tl.abs(diff)
 
     # Gradient formula
-    # if |diff| < beta: grad = diff / beta
-    # else: grad = sign(diff)
-    grad = tl.where(abs_diff < beta, diff / beta, tl.where(diff > 0, 1.0, -1.0))
+    # When beta > 0:
+    #   if |diff| < beta: grad = diff / beta
+    #   else: grad = sign(diff)
+    # When beta == 0: grad = sign(diff) (L1 loss gradient)
+    if beta > 0:
+        grad = tl.where(abs_diff < beta, diff / beta, tl.where(diff > 0, 1.0, -1.0))
+    else:
+        grad = tl.where(diff > 0, 1.0, tl.where(diff < 0, -1.0, 0.0))
 
     # Apply chain rule with grad_output
     grad_input = grad * grad_out
@@ -141,19 +153,17 @@ def smooth_l1_loss(
     logger.debug("GEMS SMOOTH_L1_LOSS FORWARD")
 
     # Validate inputs
-    if input.shape != target.shape:
-        raise ValueError(
-            f"Input and target must have the same shape. "
-            f"Got input: {input.shape}, target: {target.shape}"
-        )
-
     if reduction not in ["none", "mean", "sum"]:
         raise ValueError(
             f"reduction must be 'none', 'mean', or 'sum'. Got: {reduction}"
         )
 
-    if beta <= 0:
-        raise ValueError(f"beta must be positive. Got: {beta}")
+    if beta < 0:
+        raise ValueError(f"beta must be non-negative. Got: {beta}")
+
+    # Broadcast target to match input shape if needed
+    if input.shape != target.shape:
+        target = torch.broadcast_to(target, input.shape)
 
     # Ensure contiguous
     input = input.contiguous()
@@ -214,12 +224,9 @@ def smooth_l1_loss_backward(
     """
     logger.debug("GEMS SMOOTH_L1_LOSS BACKWARD")
 
-    # Validate inputs
+    # Broadcast target to match input shape if needed
     if input.shape != target.shape:
-        raise ValueError(
-            f"Input and target must have the same shape. "
-            f"Got input: {input.shape}, target: {target.shape}"
-        )
+        target = torch.broadcast_to(target, input.shape)
 
     # Ensure contiguous
     input = input.contiguous()

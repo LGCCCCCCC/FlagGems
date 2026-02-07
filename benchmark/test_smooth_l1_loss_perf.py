@@ -51,16 +51,16 @@ class SmoothL1LossBenchmark(GenericBenchmark):
     """Benchmark class for smooth_l1_loss operations."""
 
     def get_input_iter(self, cur_dtype) -> Generator:
-        # 按照赛题要求：小尺寸、常规尺寸、大尺寸
+        # Test shapes: small, medium, and large sizes
         shapes = [
-            # 小尺寸 (Small)
+            # Small sizes
             (8, 8),  # 64 elements
             (64, 64),  # 4K elements
-            # 常规尺寸 (Medium)
+            # Medium sizes
             (256, 256),  # 64K elements
             (512, 512),  # 256K elements
             (1024, 1024),  # 1M elements
-            # 大尺寸 (Large)
+            # Large sizes
             (2048, 2048),  # 4M elements
             (4096, 4096),  # 16M elements
         ]
